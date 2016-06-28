@@ -15,6 +15,7 @@ import {
   ScrollView,
   AsyncStorage,
 } from 'react-native';
+const moment = require('moment');
 
 class ExpTracker extends Component {
   constructor(props) {
@@ -28,9 +29,11 @@ class ExpTracker extends Component {
       expYear: '',
     };
     this.updateExpirationName = this.updateExpirationName.bind(this);
-    this.updateExpirationDate = this.updateExpirationDate.bind(this);
     this.addExpiration = this.addExpiration.bind(this);
     this.removeExpiration = this.removeExpiration.bind(this);
+    this.updateExpMonth = this.updateExpMonth.bind(this);
+    this.updateExpDay = this.updateExpDay.bind(this);
+    this.updateExpYear = this.updateExpYear.bind(this);
   }
   renderExpirationList() {
     if (this.state.expirations.length > 0) {
@@ -49,17 +52,35 @@ class ExpTracker extends Component {
   }
   renderExpiration(expiration, i) {
     return (
-      <View key={i} style={i < this.state.expirations.length - 1 ? { borderBottomWidth: 1, borderBottomColor: '#eee', flexDirection: 'row', margin: 10} : {flexDirection: 'row', margin: 10}}>
+      <View key={i} style={[this.expirationStyle(i), this.expirationDivider(), this.expirationBackground(expiration.expirationDate)]}>
         <TouchableHighlight style={{flex: 1, alignItems: 'center', justifyContent: 'center'}} underlayColor="#fbb" onPress={() => this.removeExpiration(i)}>
           <Text>
             X
           </Text>
         </TouchableHighlight>
-        <Text style={{flex: 10}}>
-          {expiration.expirationName} on ({expiration.expirationDate})
+        <Text style={{flex: 2}}>
+          {expiration.expirationName}
+        </Text>
+        <Text style={{flex: 2}}>
+          {expiration.expirationDate}
         </Text>
       </View>
     );
+  }
+  expirationDivider(i) {
+    if (i < this.state.expirations.length - 1) {
+      return { borderBottomWidth: 1, borderBottomColor: '#eee' };
+    }
+  }
+  expirationStyle() {
+    return { flexDirection: 'row', margin: 10, paddingTop: 7, paddingBottom: 7 };
+  }
+  expirationBackground(date) {
+    if (moment(date, "MM/DD/YYYY") < moment().add(1, 'month')) {
+      return { backgroundColor: '#f77' };
+    } else {
+      return { backgroundColor: '#fff' };
+    }
   }
   updateExpirationName(expirationName) {
     this.setState({expirationName});
@@ -73,42 +94,26 @@ class ExpTracker extends Component {
   updateExpYear(expYear) {
     this.setState({expYear});
   }
-  updateExpirationDate(expirationDate) {
-    let exp = `${expirationDate}`;
-    if (exp.length > this.state.expirationDate.length) {
-      const segments = exp.split('/');
-      if (segments.length >= 3 && expirationDate[expirationDate.length-1] === '/') {
-        return;
-      }
-      if (expirationDate[expirationDate.length] !== '1' && exp[exp.length-1] != '/' && segments.length < 3) {
-        exp += '/';
-      }
-      if ((exp.length === 2 || exp.length === 5) && exp[exp.length-1] != '/' && segments.length < 3) {
-        exp += '/';
-      }
-      if (segments[2] && segments[2].length > 2) {
-        return;
-      }
-      if (expirationDate.length > 8) {
-        return;
-      }
-    }
-    this.setState({expirationDate: exp});
-  }
   addExpiration() {
+    const days = this.state.expDay.trim().length > 0 ? this.state.expDay.trim() : '01';
+    const fullExpiration = `${this.state.expMonth.trim()}/${days}/${this.state.expYear.trim()}`;
     const expiration = {
       expirationName: this.state.expirationName.trim(),
-      expirationDate: this.state.expirationDate.trim(),
+      expirationDate: fullExpiration,
     };
     this.setState({
       expirations: [...this.state.expirations, expiration],
       expirationName: '',
-      expirationDate: '',
+      expMonth: '',
+      expDay: '',
+      expYear: '',
     });
     this.storeExpirations();
   }
   storeExpirations() {
-    AsyncStorage.setItem('expirations', JSON.stringify(this.state.expirations));
+    AsyncStorage.setItem('expirations', JSON.stringify(this.state.expirations), () => {
+      console.log("Successfully stored expiration list!");
+    });
   }
   loadExpirations() {
     AsyncStorage.getItem('expirations').then((expirations) => {
@@ -136,23 +141,39 @@ class ExpTracker extends Component {
             placeholder="What is Expiring?"
             value={this.state.expirationName}
             onChangeText={this.updateExpirationName}
+            autoFocus={true}
+            returnKeyType='next'
           />
         </View>
         <View style={[styles.inputFieldContainers]}>
-          <TextInput style={[styles.inputFields]} placeholder="MM"/>
-          <TextInput style={[styles.inputFields]} placeholder="DD"/>
-          <TextInput style={[styles.inputFields]} placeholder="YYYY"/>
-        </View>
-        { /*
-        <View style={styles.inputFieldContainers}>
           <TextInput
-            style={styles.inputFields}
-            placeholder="MM/DD/YY"
-            value={this.state.expirationDate}
-            onChangeText={this.updateExpirationDate}
+            style={[styles.inputFields]}
+            placeholder="MM"
+            onChangeText={this.updateExpMonth}
+            keyboardType='numeric'
+            maxLength={2}
+            returnKeyType='next'
+            value={this.state.expMonth}
+          />
+          <TextInput
+            style={[styles.inputFields]}
+            placeholder="DD"
+            onChangeText={this.updateExpDay}
+            keyboardType='numeric'
+            maxLength={2}
+            returnKeyType='next'
+            value={this.state.expDay}
+          />
+          <TextInput
+            style={[styles.inputFields]}
+            placeholder="YYYY"
+            onChangeText={this.updateExpYear}
+            keyboardType='numeric'
+            maxLength={4}
+            returnKeyType='next'
+            value={this.state.expYear}
           />
         </View>
-        */ }
         <TouchableHighlight
           style={styles.addButton}
           underlayColor="#41B9FF"
@@ -175,6 +196,13 @@ class ExpTracker extends Component {
     );
   }
 }
+
+const highlightBorder = () => ({
+  borderColor: '#f00',
+});
+const unhighlightBorder = () => ({
+  borderColor: '#efefef',
+})
 
 const styles = StyleSheet.create({
   container: { flex: 1, marginTop: 20 },
@@ -217,7 +245,7 @@ const styles = StyleSheet.create({
   },
   sectionHeaderText: {
     fontWeight: 'bold',
-    fontSize: 14,
+    fontSize: 16,
   },
 });
 
